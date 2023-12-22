@@ -66,6 +66,7 @@ def drop_unliked_sessions(data):
             liked_sessions.append(id)
 
     data = data[data[SESSION_ID].isin(liked_sessions)]
+    data = data.reset_index(drop=True)
     return data, liked_sessions
 
 
@@ -80,7 +81,7 @@ SESSION_GROUPS_FILE = 'session_groups.json'
 def add_to_session_groups(data, session_ids, session_groups):
     group_map = {}
     for id in session_ids:
-        group_map[id] = data.index[data[SESSION_ID] == id].tolist()
+        group_map[id] = data[data[SESSION_ID] == id].index.tolist()
         if max(group_map[id]) > data.shape[0]:
             print(data.iloc[[group_map[id]]])
             print(data.shape, id, group_map[id])
@@ -183,6 +184,6 @@ unlike_dropped, session_ids = drop_unliked_sessions(
 
 session_groups = get_session_groups(unlike_dropped, session_ids)
 features_filtered = filter_features(unlike_dropped)  # (165095, 31)
-# y = features_filtered[LABEL_COL].to_numpy()
-# X = process_numerics(features_filtered.drop(LABEL_COL, axis=1), y)
-# kd_tree = KDTree(X, leaf_size=np.round(np.log(X.shape[0])).astype(int))
+y = features_filtered[LABEL_COL].to_numpy()
+X = process_numerics(features_filtered.drop(LABEL_COL, axis=1), y)
+kd_tree = KDTree(X, leaf_size=np.round(np.log(X.shape[0])).astype(int))

@@ -37,10 +37,11 @@ def get_instances(groups):
     return list(map(lambda g: split_session_group(g), groups))
 
 
+# avg cos-sim: 0.19861769
 def run_baseline(X, groups):
     instances = get_instances(groups)
     total_tests = 0
-    total_cos_sim = np.zeros((1, X.shape[1]))
+    total_cos_sim = 0
     for (train, test) in instances:
         train_rows = X[train, :]
         test_rows = X[test, :]
@@ -50,7 +51,7 @@ def run_baseline(X, groups):
         total_tests += len(test_rows)
         total_cos_sim += sum([cos_sim(pred, row)
                               for row in test_rows])
-    print(X.shape, print(total_tests))
+    print(X.shape, total_tests)
     return total_cos_sim / total_tests
 
 
