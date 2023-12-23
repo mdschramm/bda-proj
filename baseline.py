@@ -1,4 +1,4 @@
-from process_data import rng, X, session_groups, kd_tree
+from process_data import rng, X, track_features, session_groups, kd_tree
 import numpy as np
 
 # test random point
@@ -41,19 +41,21 @@ def get_instances(groups):
 def run_baseline(X, groups):
     instances = get_instances(groups)
     total_tests = 0
+    total_trains = 0
     total_cos_sim = 0
     for (train, test) in instances:
-        train_rows = X[train, :]
-        test_rows = X[test, :]
+        train_rows = (X.iloc[train]).to_numpy()
+        test_rows = (X.iloc[test]).to_numpy()
         avg = np.array([np.mean(train_rows, axis=0)])
         dist_avg_to_pred, ind = kd_tree.query(avg, k=1)
-        pred = X[ind]
+        pred = X.iloc[[ind[0][0]]]
+        total_trains += len(train_rows)
         total_tests += len(test_rows)
         total_cos_sim += sum([cos_sim(pred, row)
                               for row in test_rows])
-    print(X.shape, total_tests)
+    print(X.shape, total_tests, total_trains)
     return total_cos_sim / total_tests
 
 
-avg_sim = run_baseline(X, session_groups)
+avg_sim = run_baseline(X[track_features], session_groups)
 print(avg_sim)
