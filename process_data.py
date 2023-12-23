@@ -82,9 +82,6 @@ def add_to_session_groups(data, session_ids, session_groups):
     group_map = {}
     for id in session_ids:
         group_map[id] = data[data[SESSION_ID] == id].index.tolist()
-        if max(group_map[id]) > data.shape[0]:
-            print(data.iloc[[group_map[id]]])
-            print(data.shape, id, group_map[id])
     session_groups.append(group_map)
 
 
@@ -149,34 +146,29 @@ track_features = [
 
 
 def filter_features(data):
-    return data[track_features + ['track_id', LABEL_COL]]
+    return data[track_features + ['track_id']]
 
 # StandardScaling and one-hot encoding
 
 
-def process_numerics(X, y):
-    release_year_idx = X.columns.get_loc('release_year')
-
-    key_time = [X.columns.get_loc(name)
-                for name in ['key', 'time_signature']]
+def process_numerics(X, y=None):
     column_transformer = ColumnTransformer(
         [
             # normalize numerical features
             ('scale_numbers', StandardScaler(),
              make_column_selector(dtype_include=np.float64)),
             # normalize release year
-            ('scale_year', StandardScaler(), [release_year_idx]),
+            ('scale_year', StandardScaler(), ['release_year']),
             # one-hot encode the categorical variables
             ('encode_major_or_minor', OrdinalEncoder(),
-             [X.columns.get_loc('mode')]),
+             ['mode']),
             ('target_encode_key_mode', CountEncoder(
-                normalize=True, cols=['key', 'time_signature']), key_time)
-
-
+                normalize=True, cols=['key', 'time_signature']), ['key', 'time_signature'])
         ], remainder='passthrough'
     )
+    X.loc[:, track_features] = column_transformer.fit_transform(
+        X.loc[:, track_features], y)
 
-    X[track_features] = column_transformer.fit_transform(X[track_features], y)
     return X
 
 
@@ -186,7 +178,10 @@ unlike_dropped, session_ids = drop_unliked_sessions(
 
 session_groups = get_session_groups(unlike_dropped, session_ids)
 features_filtered = filter_features(unlike_dropped)  # (165095, 31)
-y = features_filtered[LABEL_COL].to_numpy()
-X = process_numerics(features_filtered.drop(LABEL_COL, axis=1), y)
+
+X = process_numerics(features_filtered)
+tracks = process_numerics(tracks)
+
+
 kd_tree = KDTree(X[track_features], leaf_size=np.round(
     np.log(X.shape[0])).astype(int))
