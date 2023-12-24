@@ -51,7 +51,8 @@ def run_baseline(X, tracks, groups):
         avg = np.array([np.mean(x_rows, axis=0)])
         ind = nearest_tracks.kneighbors(
             avg, n_neighbors=1, return_distance=False)
-        pred = tracks.iloc[[ind[0][0]]]  # 0.16990661207465263
+        # pred = tracks.iloc[[ind[0][0]]]  # 0.16990661207465263
+        pred = np.mean(y_rows, axis=0)  # .281
         # pred = tracks.iloc[0]  # -0.009710992261819977
         total_x += x_rows.shape[0]
         total_y += y_rows.shape[0]

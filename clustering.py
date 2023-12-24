@@ -11,15 +11,11 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 # Cluster training tracks by features - build map from track_id to cluster
 
-N_TRACK_CLUSTERS = 6000
+N_TRACK_CLUSTERS = 3000
 N_USER_CLUSTERS = 100
 COLLAB_FILTERING_NEIGHBORS = 8
 CLUSTER_CENTERS_FILE = 'track_feature_cluster_centers.npy'
 CLUSTER_LABELS_FILE = 'track_feature_cluster_labels.npy'
-
-# create 10 kfold splits of .9 train and .1 test
-kf = KFold(n_splits=10)
-group_splits = kf.split(session_groups)
 
 
 def cluster_tracks_by_features(tracks, n_clusters=N_TRACK_CLUSTERS):
@@ -96,6 +92,7 @@ def get_uc_to_tc(user_tc):
                     n_init='auto').fit(user_tc)
     uc_to_tc = np.zeros((N_USER_CLUSTERS, N_TRACK_CLUSTERS))
 
+    # add assigned cluster for each user
     for i, row in enumerate(user_tc):
         uc = kmeans.labels_[i]
         uc_to_tc[uc] += row
@@ -188,6 +185,10 @@ def get_split_sims(test_groups, uc_to_tc, kmeans, X, uc_neighbors):
 
     return total_cos_sim, total_y_rows
 
+
+# create 10 kfold splits of .9 train and .1 test
+kf = KFold(n_splits=10)
+group_splits = kf.split(session_groups)
 
 total_sim = 0
 total_rows = 0
