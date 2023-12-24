@@ -5,9 +5,10 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer, make_column_selector
-from sklearn.preprocessing import OrdinalEncoder, StandardScaler
+from sklearn.preprocessing import OrdinalEncoder, normalize, StandardScaler
 from category_encoders import CountEncoder
-from sklearn.neighbors import KDTree
+from sklearn.neighbors import NearestNeighbors
+
 
 rng = np.random.default_rng(seed=123)
 
@@ -22,6 +23,10 @@ track_features_index = 'track_id'
 
 data = pd.merge(sessions, tracks,
                 left_on='track_id_clean', right_on='track_id')
+
+N_TESTS_PER_USER = 4
+MIN_GROUP_SIZE = 5
+MAX_GROUP_SIZE = 30
 
 '''
 Labeling:
@@ -62,7 +67,7 @@ def drop_unliked_sessions(data):
     total_like_count = 0
     for id in session_like_counts:
         total_like_count += session_like_counts[id]
-        if session_like_counts[id] > 1:
+        if session_like_counts[id] > N_TESTS_PER_USER:
             liked_sessions.append(id)
 
     data = data[data[SESSION_ID].isin(liked_sessions)]
@@ -91,14 +96,12 @@ def get_session_groups(data, session_ids):
             session_groups = json.load(f)
             return session_groups
 
-    min_group_size = 2
-    max_group_size = 10
     n_sessions = len(session_ids)
     rng.shuffle(session_ids)
     sessions_seen = 0
     session_groups = []
-    while sessions_seen < n_sessions - max_group_size:
-        group_size = rng.integers(min_group_size, max_group_size + 1)
+    while sessions_seen < n_sessions - MAX_GROUP_SIZE:
+        group_size = rng.integers(MIN_GROUP_SIZE, MAX_GROUP_SIZE + 1)
         new_seen = sessions_seen + group_size
         add_to_session_groups(
             data, session_ids[sessions_seen:new_seen], session_groups)
@@ -142,12 +145,6 @@ track_features = [
     'acoustic_vector_7',
 ]
 
-# Drop unneeded columns
-
-
-def filter_features(data):
-    return data[track_features + ['track_id']]
-
 # StandardScaling and one-hot encoding
 
 
@@ -169,19 +166,22 @@ def process_numerics(X, y=None):
     X.loc[:, track_features] = column_transformer.fit_transform(
         X.loc[:, track_features], y)
 
+    X.loc[:, track_features] = normalize(X.loc[:, track_features])
     return X
 
 
 labels_added = add_labels(data)
 unlike_dropped, session_ids = drop_unliked_sessions(
-    labels_added)  # (165095, 53)
-
+    labels_added)
 session_groups = get_session_groups(unlike_dropped, session_ids)
-features_filtered = filter_features(unlike_dropped)  # (165095, 31)
 
-X = process_numerics(features_filtered)
+X = process_numerics(unlike_dropped)
 tracks = process_numerics(tracks)
 
+# n_neighbors=5 is just an initializer optimization paramter for expected queries
+nearest_tracks = NearestNeighbors(
+    n_neighbors=5, metric='cosine').fit(tracks[track_features].to_numpy())
 
-kd_tree = KDTree(X[track_features], leaf_size=np.round(
-    np.log(X.shape[0])).astype(int))
+
+def cos_sim(a, b):
+    return np.dot(a, b)/(np.linalg.norm(a)*np.linalg.norm(b))

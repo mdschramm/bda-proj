@@ -1,10 +1,14 @@
-from process_data import rng, X, track_features, session_groups, kd_tree
+from process_data import rng, X, tracks, track_features, session_groups, nearest_tracks, cos_sim, N_TESTS_PER_USER
+from sklearn.preprocessing import normalize
 import numpy as np
 
 # test random point
-# dist, ind = kd_tree.query(np.array([rng.random(X.shape[1])]), k=10)
-# [[2.58619351 2.58619351 2.58619351 2.58619351 2.58619351 2.58619351 2.58619351 2.58619351 2.58619351 2.58619351]]
-# print(dist)
+p = np.array(
+    normalize(np.array([rng.random(tracks[track_features].shape[1])])))
+# dist, ind = nearest_tracks.query(
+#     p, k=10)
+# print(ind)
+# print((cos_sim(tracks[track_features].iloc[ind[0]], np.transpose(p))))
 
 '''Baseline model:
 
@@ -14,23 +18,21 @@ import numpy as np
 ---- Calculate average distance between recommended song and hold-out songs'''
 
 
-def cos_sim(a, b):
-    return np.dot(a, b)/(np.linalg.norm(a)*np.linalg.norm(b))
-
-
 '''
 Splits group into training and test sessions
 '''
 
+# TODO could create more train-test instances
+
 
 def split_session_group(group):
-    train_rows, test_rows = [], []
+    x_rows, y_rows = [], []
     for session_id in group:
         rows = group[session_id]
-        train_rows += rows[:-1]
-        test_rows += rows[-1:]
+        x_rows += rows[:-N_TESTS_PER_USER]
+        y_rows += rows[-N_TESTS_PER_USER:]
 
-    return train_rows, test_rows
+    return x_rows, y_rows
 
 
 def get_instances(groups):
@@ -38,24 +40,26 @@ def get_instances(groups):
 
 
 # avg cos-sim: 0.19861769
-def run_baseline(X, groups):
+def run_baseline(X, tracks, groups):
     instances = get_instances(groups)
-    total_tests = 0
-    total_trains = 0
+    total_y = 0
+    total_x = 0
     total_cos_sim = 0
-    for (train, test) in instances:
-        train_rows = (X.iloc[train]).to_numpy()
-        test_rows = (X.iloc[test]).to_numpy()
-        avg = np.array([np.mean(train_rows, axis=0)])
-        dist_avg_to_pred, ind = kd_tree.query(avg, k=1)
-        pred = X.iloc[[ind[0][0]]]
-        total_trains += len(train_rows)
-        total_tests += len(test_rows)
+    for (x, y) in instances:
+        x_rows = (X.iloc[x]).to_numpy()
+        y_rows = (X.iloc[y]).to_numpy()
+        avg = np.array([np.mean(x_rows, axis=0)])
+        ind = nearest_tracks.kneighbors(
+            avg, n_neighbors=1, return_distance=False)
+        pred = tracks.iloc[[ind[0][0]]]  # 0.16990661207465263
+        # pred = tracks.iloc[0]  # -0.009710992261819977
+        total_x += x_rows.shape[0]
+        total_y += y_rows.shape[0]
         total_cos_sim += sum([cos_sim(pred, row)
-                              for row in test_rows])
-    print(X.shape, total_tests, total_trains)
-    return total_cos_sim / total_tests
+                              for row in y_rows])
+    return total_cos_sim / total_y
 
 
-avg_sim = run_baseline(X[track_features], session_groups)
+avg_sim = run_baseline(
+    X[track_features], tracks[track_features], session_groups)
 print(avg_sim)
